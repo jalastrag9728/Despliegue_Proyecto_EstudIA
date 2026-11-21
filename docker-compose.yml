@@ -1,0 +1,104 @@
+# Despliegue reproducible del MVP de Nodo Ruta.
+#   docker compose up -d --build        -> levanta todo
+#   docker compose down                 -> apaga (conserva los datos)
+#   docker compose down -v              -> apaga y BORRA el volumen de datos
+name: nodoruta
+
+x-app: &app-base
+  image: nodoruta-app:local
+  build:
+    context: ./app
+
+services:
+  # 1) Prepara los datos UNA vez: copia la semilla al volumen solo si aún no existe.
+  init-datos:
+    <<: *app-base
+    user: "0:0"
+    command: ["sh", "-c", "[ -f /data/pedidos.json ] || cp /app/seed/pedidos.json /data/pedidos.json"]
+    volumes:
+      - datos:/data
+    restart: "no"
+
+  # 2) El servicio. Varias instancias idénticas; los datos están FUERA del contenedor (volumen "datos", solo lectura).
+  app:
+    <<: *app-base
+    deploy:
+      replicas: ${REPLICAS:-2}
+    depends_on:
+      init-datos:
+        condition: service_completed_successfully
+    environment:
+      APP_VERSION: ${APP_VERSION:-1.0.0}
+      DATA_FILE: /data/pedidos.json
+    volumes:
+      - datos:/data:ro
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    read_only: true            # el sistema de archivos del contenedor no se puede modificar
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL                    # sin privilegios especiales de Linux
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 128m            # límites de consumo: controlan costo y evitan que una instancia acapare
+    cpus: 0.5
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # 3) Punto de acceso común: balanceo + comprobación de salud.
+  balanceador:
+    image: haproxy:2.8-alpine
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    ports:
+      - "127.0.0.1:${PUBLIC_PORT:-8080}:8080"   # servicio (solo accesible desde su computador)
+      - "127.0.0.1:${STATS_PORT:-8404}:8404"    # panel de estado
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # Herramientas de respaldo/restauración. No arranca con "up"; se usa con "run".
+  ops:
+    <<: *app-base
+    profiles: ["tools"]
+    user: "0:0"
+    entrypoint: ["sh", "/scripts/ops.sh"]
+    environment:
+      BACKUP_RETENTION: ${BACKUP_RETENTION:-10}
+    volumes:
+      - datos:/data                         # copia de trabajo (lectura/escritura solo aquí)
+      - ./respaldos:/respaldos              # respaldos: lugar SEPARADO de los datos
+      - ./scripts/ops.sh:/scripts/ops.sh:ro
+
+  # Respaldo automático periódico (opcional): docker compose --profile auto up -d respaldo-automatico
+  respaldo-automatico:
+    <<: *app-base
+    profiles: ["auto"]
+    user: "0:0"
+    entrypoint: ["sh", "/scripts/ops.sh", "auto"]
+    environment:
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-300}
+      BACKUP_RETENTION: ${BACKUP_RETENTION:-10}
+    volumes:
+      - datos:/data:ro                      # solo lectura: el respaldo nunca modifica los datos
+      - ./respaldos:/respaldos
+      - ./scripts/ops.sh:/scripts/ops.sh:ro
+    restart: unless-stopped
+
+volumes:
+  datos:

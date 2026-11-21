@@ -1,0 +1,17 @@
+# Secretos: NUNCA se suben al repositorio
+.env
+*.pem
+*.key
+secrets/
+
+# Respaldos y evidencias locales (se generan al probar)
+respaldos/*
+!respaldos/.gitkeep
+evidencias/*
+!evidencias/.gitkeep
+!evidencias/README.md
+
+__pycache__/
+*.pyc
+.vscode/
+.idea/

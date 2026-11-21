@@ -1,0 +1,6 @@
+# Evita que Windows convierta los finales de línea (rompería scripts dentro de contenedores Linux).
+* text=auto
+*.sh text eol=lf
+*.cfg text eol=lf
+*.yml text eol=lf
+Dockerfile text eol=lf

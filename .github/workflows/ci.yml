@@ -1,0 +1,50 @@
+name: CI - validar y probar el MVP
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validar:
+    name: Validar código y configuración
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Pruebas unitarias de la app
+        run: python -m unittest discover -s tests -v
+      - name: Sintaxis de scripts
+        run: |
+          sh -n scripts/ops.sh
+          python -m py_compile scripts/pruebas.py app/app.py
+      - name: Validar docker-compose.yml
+        run: docker compose config -q
+      - name: Validar configuración del balanceador
+        run: |
+          docker run --rm \
+            -v "$PWD/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro" \
+            haproxy:2.8-alpine haproxy -c -f /usr/local/etc/haproxy/haproxy.cfg
+
+  pruebas-despliegue:
+    name: Pruebas de despliegue, caída y recuperación
+    needs: validar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Ejecutar escenarios (normal, caída, persistencia, respaldo/restauración)
+        run: python scripts/pruebas.py --limpiar
+      - name: Guardar evidencias
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidencias
+          path: evidencias/
