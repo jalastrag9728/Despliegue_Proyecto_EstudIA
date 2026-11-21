@@ -1,8 +1,11 @@
 .git
 .github
+data
 respaldos
 evidencias
 docs
 tests
+scripts
+proxy
 *.md
 __pycache__

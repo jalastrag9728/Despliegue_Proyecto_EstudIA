@@ -1,6 +1,6 @@
-# Evita que Windows convierta los finales de línea (rompería scripts dentro de contenedores Linux).
+# Los archivos que viven dentro de contenedores Linux deben conservar finales de linea LF.
 * text=auto
-*.sh text eol=lf
-*.cfg text eol=lf
-*.yml text eol=lf
 Dockerfile text eol=lf
+*.conf text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf

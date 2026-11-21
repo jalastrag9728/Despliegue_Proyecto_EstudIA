@@ -1,0 +1,79 @@
+# Despliegue reproducible de Nodo Ruta (caso ficticio):
+#   2 instancias de la app detras de un proxy NGINX; datos FUERA del contenedor (data/pedidos.json).
+#
+#   Preparar datos:  python scripts/datos.py preparar
+#   Levantar:        docker compose up -d --build
+#   Apagar:          docker compose down        (no borra data/, respaldos/ ni evidencias/)
+name: nodo-ruta
+
+x-app: &app
+  build:
+    context: .
+  image: nodo-ruta-app:local
+  restart: unless-stopped          # si el proceso se cae solo, Docker lo vuelve a iniciar
+  init: true                       # el proceso principal recibe bien la senal de apagado (docker stop no espera 10 s)
+  stop_grace_period: 3s
+  read_only: true                  # el sistema de archivos del contenedor no se puede modificar
+  cap_drop: [ALL]                  # sin privilegios especiales de Linux
+  security_opt: ["no-new-privileges:true"]
+  mem_limit: 128m                  # limites de consumo (controlan costo y evitan abusos)
+  cpus: 0.5
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+  healthcheck:                     # Docker marca healthy/unhealthy; NO retira ni reinicia por si solo
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2).read()"]
+    interval: 5s
+    timeout: 3s
+    retries: 3
+    start_period: 5s
+
+services:
+  app1:
+    <<: *app
+    environment:
+      INSTANCE_ID: app1
+      DATA_PATH: /data/pedidos.json
+    volumes:
+      - type: bind
+        source: ./data/pedidos.json     # copia de trabajo (creada con datos.py preparar)
+        target: /data/pedidos.json
+        read_only: true                 # las apps solo leen
+        bind:
+          create_host_path: false       # si no existe, falla con mensaje claro (no crea una carpeta vacia)
+
+  app2:
+    <<: *app
+    environment:
+      INSTANCE_ID: app2
+      DATA_PATH: /data/pedidos.json
+    volumes:
+      - type: bind
+        source: ./data/pedidos.json
+        target: /data/pedidos.json
+        read_only: true
+        bind:
+          create_host_path: false
+
+  proxy:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PUBLIC_PORT:-8080}:80"   # unico puerto publicado; solo desde este computador
+    volumes:
+      - type: bind
+        source: ./proxy/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      app1:
+        condition: service_healthy
+      app2:
+        condition: service_healthy
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 64m
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

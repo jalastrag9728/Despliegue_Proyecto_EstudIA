@@ -1,45 +1,45 @@
-# Qué se probó y qué quedó como diseño
+# Qué funciona, qué se verificó y qué quedó como diseño
 
-## Mecanismos PROBADOS (demostración local con contenedores)
+## Mecanismos de la demostración local (se prueban con I01-I05)
 
-| Mecanismo | Cómo se prueba | Evidencia |
+| ID | Mecanismo | Evidencia |
 |---|---|---|
-| Despliegue reproducible con un comando | `docker compose up -d --build` | `pruebas.py` (prueba 0) |
-| Reparto de solicitudes entre 2 instancias | 20 consultas, se cuentan instancias distintas | prueba 1 |
-| Conmutación ante la detención de 1 instancia | `docker stop` + consulta continua 15 s; se registran errores y ventana de error | prueba 2a |
-| Reintegro de la instancia | `docker start`; se mide el tiempo hasta que vuelve a atender | prueba 2b |
-| Datos fuera del almacenamiento efímero | Recrear contenedores; misma versión y mismo hash de datos | prueba 3 |
-| Respaldo, alteración y restauración | `ops backup / tamper / restore`; se compara versión y SHA-256 | prueba 4 |
-| Tiempo de recuperación | Desde la detección de la alteración hasta datos correctos servidos | prueba 4c |
+| I01 | Reparto entre 2 instancias por el acceso común | `verificar_servicio.py` → `CUMPLE`, `app1` y `app2` |
+| I02 | Conmutación al detener `app1` | consulta continua 15 s: errores y tiempo |
+| I03 | Reintegro de `app1` | tiempo hasta ver ambas instancias |
+| I04 | Datos fuera del contenedor (recrear `app1`) | misma versión y mismo SHA-256 de `data/pedidos.json` |
+| I05 | Alteración → 503 → restauración | 503 en ambas instancias; versión, 6 pedidos y SHA-256 recuperados; tiempo medido |
+| I06 | Repetir con otro integrante | **No realizado** hasta que alguien lo haga |
 
-## Qué se verificó al construir este kit
+## Qué se verificó al construir este kit (y qué NO)
 
-- Pruebas unitarias de la app (6 pruebas) y cierre limpio ante `SIGTERM`.
-- Script `ops.sh`: respaldo, alteración, restauración, rechazo de respaldo corrupto y retención.
-- Sintaxis de `pruebas.py` y `docker-compose.yml`.
-- **No se ejecutó Docker durante la construcción** (entorno sin Docker). La primera ejecución completa de `pruebas.py` debe hacerse en su equipo o en GitHub Actions;
-  si algún ajuste menor es necesario (versiones de imagen, rutas en Windows), quedará reflejado en las evidencias.
+| Verificado | Cómo |
+|---|---|
+| `app.py`, `datos.py` | 7 pruebas locales (`tests/test_kit.py`): `/health`, `/pedidos`, ciclo respaldar → error → restaurar, rechazo de respaldo alterado y de rutas fuera de `respaldos/` |
+| Orquestación de `pruebas_automaticas.py` | Ejecutada de punta a punta con un **simulador** de Docker (procesos locales y un proxy sencillo): lectura de resultados, tiempos y generación del informe |
+| **NO verificado** | `docker compose` real, la imagen, **la configuración de NGINX** y el comportamiento real de reintentos y DNS. El entorno de construcción no tenía Docker ni NGINX |
 
-## Lo que queda como DISEÑO (no probado)
+> La primera corrida real de `python scripts/pruebas_automaticas.py` (en su equipo o en GitHub Actions) es la que valida el despliegue. Si algo
+> necesita ajuste (versiones de imagen, rutas en Windows, tiempos de reintegro), quedará reflejado en el informe. **No marque pruebas como
+> realizadas por haber leído estos archivos.**
 
-- Despliegue en nube (ver `NUBE_EQUIVALENTE.md`).
-- Alta disponibilidad real entre zonas; tolerancia a la caída de un centro de datos.
-- Replicación de datos; respaldo en otra región/cuenta.
-- TLS, autenticación, alertas automáticas, escaneo de vulnerabilidades en CI.
-- Actualización gradual (*rolling update*) sin interrupción: hoy `--force-recreate` reemplaza las instancias casi a la vez y puede haber una pausa breve.
+## Diseño (no probado)
+
+Despliegue en nube; alta disponibilidad entre zonas; replicación de datos; respaldo fuera del computador; HTTPS y permisos; alertas;
+chequeo **activo** de salud; actualización gradual con reversión automática.
 
 ## Limitaciones a declarar en el pitch
 
-1. **Dos contenedores en un mismo computador NO son alta disponibilidad.** Si el computador cae, cae todo.
-2. El volumen `datos` es un **punto único de falla**; el respaldo reduce el daño pero no evita una pérdida entre respaldos (RPO = intervalo de respaldo).
-3. El balanceador es **una sola pieza**; en nube sería un servicio administrado y redundante.
-4. Las pruebas usan tráfico mínimo y datos sintéticos: no miden capacidad ni rendimiento.
-5. Los tiempos medidos son de **este** entorno y **esta** prueba; no son un compromiso de disponibilidad.
+1. Dos contenedores en un solo computador **no prueban tolerancia al fallo de ese computador**.
+2. **Puntos únicos de fallo:** el computador, el proxy y el archivo `data/pedidos.json` compartido.
+3. **Detección pasiva:** NGINX descubre una instancia caída al intentar usarla; Docker marca *unhealthy* pero no retira ni reinicia por sí solo.
+4. Una segunda instancia **no** resuelve el fallo de datos compartidos (por eso I05 da 503 en ambas).
+5. Persistir no es respaldar: recrear `app1` conserva datos, pero no protege de una alteración.
+6. La restauración escribe sobre el archivo montado y puede producir un **503 breve** durante la operación.
+7. El RPO es el tiempo desde el último respaldo (los respaldos son manuales).
+8. Los tiempos son de **este** entorno y **esta** prueba; no son un compromiso de disponibilidad. No es una prueba de carga.
 
-## Mejoras propuestas para el encuentro 3
+## Mejora propuesta para el encuentro 3
 
-1. Despliegue en nube gratuita/educativa con 2+ réplicas en zonas distintas y balanceador administrado.
-2. Respaldo automático a almacenamiento de objetos con versionado + prueba de restauración programada.
-3. Alertas (salud, 5xx, respaldo fallido) y un tablero simple.
-4. Actualización gradual con *rollback* automático por health check.
-5. Escaneo de imagen y de dependencias en CI; fijar imágenes por *digest*.
+Priorizada: (1) separar los datos del computador (almacenamiento/BD administrada) y respaldos fuera del equipo; (2) réplicas en 2 zonas con
+balanceador administrado y health checks activos; (3) respaldo automático con restauración probada periódicamente; (4) alertas; (5) HTTPS.

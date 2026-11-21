@@ -4,12 +4,14 @@
 *.key
 secrets/
 
-# Respaldos y evidencias locales (se generan al probar)
+# Copia de trabajo, respaldos y evidencias locales (se generan al probar)
+data/
 respaldos/*
 !respaldos/.gitkeep
 evidencias/*
 !evidencias/.gitkeep
 !evidencias/README.md
+!evidencias/PLANTILLA_EVIDENCIAS.md
 
 __pycache__/
 *.pyc

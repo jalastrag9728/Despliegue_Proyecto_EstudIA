@@ -17,22 +17,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Pruebas unitarias de la app
+      - name: Pruebas locales (sin Docker)
         run: python -m unittest discover -s tests -v
       - name: Sintaxis de scripts
+        run: python -m py_compile app.py scripts/datos.py scripts/verificar_servicio.py scripts/ejecutar_local.py scripts/pruebas_automaticas.py
+      - name: Validar compose.yaml
         run: |
-          sh -n scripts/ops.sh
-          python -m py_compile scripts/pruebas.py app/app.py
-      - name: Validar docker-compose.yml
-        run: docker compose config -q
-      - name: Validar configuración del balanceador
+          mkdir -p data && cp pedidos.json data/pedidos.json
+          docker compose config -q
+      - name: Validar configuración de NGINX
         run: |
-          docker run --rm \
-            -v "$PWD/haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro" \
-            haproxy:2.8-alpine haproxy -c -f /usr/local/etc/haproxy/haproxy.cfg
+          docker run --rm --add-host app1:127.0.0.1 --add-host app2:127.0.0.1 \
+            -v "$PWD/proxy/nginx.conf:/etc/nginx/nginx.conf:ro" nginx:1.28-alpine nginx -t
 
   pruebas-despliegue:
-    name: Pruebas de despliegue, caída y recuperación
+    name: Pruebas I01-I05 (despliegue real)
     needs: validar
     runs-on: ubuntu-latest
     steps:
@@ -40,8 +39,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Ejecutar escenarios (normal, caída, persistencia, respaldo/restauración)
-        run: python scripts/pruebas.py --limpiar
+      - name: Ejecutar pruebas automáticas
+        run: python scripts/pruebas_automaticas.py --reiniciar-datos --limpiar
       - name: Guardar evidencias
         if: always()
         uses: actions/upload-artifact@v4

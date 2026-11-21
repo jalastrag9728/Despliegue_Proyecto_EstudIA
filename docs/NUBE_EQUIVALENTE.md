@@ -1,46 +1,48 @@
 # Diseño equivalente en la nube (documentado, NO desplegado)
 
-> Cumple la condición del reto: *"sin cuenta habilitada sin cobros, se admite demostración local y un diseño documentado equivalente en nube"*.
-> **No se contrató ningún recurso.** Esta sección es diseño; lo que sí se probó es la demostración local.
+> La guía indica que, si no hay cuenta habilitada por el entorno educativo, se documenta la demostración local y el **diseño pendiente**.
+> **No se contrató ningún recurso ni se inventaron precios.** Lo probado es la demostración local; esto es diseño.
 
 ## Equivalencias pieza por pieza
 
-| Pieza local | Qué hace | Equivalente en Azure | Equivalente en AWS | Equivalente en Google Cloud |
-|---|---|---|---|---|
-| Imagen `nodoruta-app` | Empaqueta la app | Azure Container Registry (o GHCR) | Amazon ECR (o GHCR) | Artifact Registry (o GHCR) |
-| 2+ instancias `app` | Réplicas del servicio | Azure Container Apps (mín. 2 réplicas) | ECS Fargate (2 tareas) | Cloud Run (mín. 2 instancias) |
-| HAProxy | Punto de acceso + balanceo + salud | Ingress de Container Apps / Application Gateway | Application Load Balancer + *target group* con health check | Cloud Load Balancing |
-| `GET /health` | Salud | *Health probes* (liveness/readiness) | Health check del *target group* | Health checks / startup probes |
-| Volumen `datos` | Datos fuera del contenedor | Azure Files (o base de datos administrada) | Amazon EFS (o RDS/DynamoDB) | Filestore o Cloud Storage (o Cloud SQL) |
-| `respaldos/` + `ops.sh` | Copias separadas verificables | Blob Storage (otra cuenta/región) con retención | S3 (otra cuenta/región) con versionado y ciclo de vida | Cloud Storage con versionado y retención |
-| `docker compose logs` | Registros | Log Analytics / Azure Monitor | CloudWatch Logs | Cloud Logging |
-| Panel `/stats` | Estado | Azure Monitor métricas | CloudWatch métricas / alarmas | Cloud Monitoring |
-| GitHub Actions | Construir y desplegar | GitHub Actions + OIDC (sin claves guardadas) | GitHub Actions + OIDC | GitHub Actions + Workload Identity |
-| `.env` / secretos | Configuración sensible | Key Vault | Secrets Manager | Secret Manager |
+| Pieza local | Azure | AWS | Google Cloud |
+|---|---|---|---|
+| Imagen `nodo-ruta-app` | Azure Container Registry | Amazon ECR | Artifact Registry |
+| `app1`, `app2` | Azure Container Apps (mín. 2 réplicas) | ECS Fargate (2 tareas) | Cloud Run (mín. 2 instancias) |
+| Proxy NGINX + reintentos | Ingress / Application Gateway | Application Load Balancer | Cloud Load Balancing |
+| `/health` | Health probes | Health check del *target group* | Health checks |
+| `data/pedidos.json` | Azure Files, o BD administrada | Amazon EFS, o RDS/DynamoDB | Filestore, o Cloud SQL |
+| `respaldos/` + `datos.py` | Blob Storage (otra cuenta/región, con retención) | S3 con versionado | Cloud Storage con versionado |
+| `docker compose logs` | Azure Monitor / Log Analytics | CloudWatch Logs | Cloud Logging |
+| Permisos del equipo | Roles (RBAC) con mínimo privilegio | IAM con mínimo privilegio | IAM con mínimo privilegio |
+| HTTPS | Certificado administrado en el ingress | ACM en el ALB | Certificado administrado |
+| Secretos (si aparecieran) | Key Vault | Secrets Manager | Secret Manager |
 
-## Cómo se obtendría alta disponibilidad real (mejora, no probada aquí)
+## Cómo se eliminarían los puntos únicos de fallo (mejora, no probada)
 
-1. Réplicas repartidas en **al menos 2 zonas de disponibilidad**.
-2. Datos en almacenamiento **replicado entre zonas** (o base de datos administrada con réplica).
-3. Respaldos en una **cuenta y región distintas**, con versionado y pruebas periódicas de restauración.
-4. Alertas sobre salud, errores 5xx y fallos de respaldo.
-5. Despliegue gradual (*rolling update*) con *rollback* automático si falla la salud.
+| Hoy (local) | En nube |
+|---|---|
+| Un solo computador | Réplicas en **≥ 2 zonas de disponibilidad** |
+| Un solo proxy | Balanceador administrado y redundante |
+| Un solo archivo compartido | Almacenamiento replicado entre zonas o base de datos administrada |
+| Respaldos en el mismo equipo | Respaldos en otra cuenta/región, versionados, con prueba de restauración periódica |
+| Detección pasiva | Health checks **activos** del balanceador + alertas |
 
-## Factores de consumo que generarían costo
+## Permisos y HTTPS
 
-(No se incluyen precios: dependen del proveedor, región y vigencia de la cuenta educativa.)
+Una identidad por componente con permisos mínimos (la app solo lee datos; el proceso de respaldo solo escribe en el almacenamiento de respaldos);
+acceso humano por roles, con autenticación multifactor; HTTPS terminado en el balanceador con certificado administrado; nada de claves en el repositorio.
+
+## Factores de consumo que podrían generar costo (sin precios)
 
 | Factor | Qué lo hace crecer | Cómo controlarlo |
 |---|---|---|
-| Cómputo (vCPU/memoria × horas × réplicas) | Más réplicas, más tamaño, más horas encendido | Mínimo de réplicas, límites de recursos, apagar fuera de la demo |
-| Balanceador (horas + volumen procesado) | Siempre activo y con mucho tráfico | Un solo balanceador compartido; retirar tras la prueba |
-| Almacenamiento de datos (GB-mes + operaciones) | Tamaño del archivo/base | Datos pequeños; clase de almacenamiento mínima |
-| Respaldos (GB-mes + operaciones + transferencia) | Frecuencia × retención × tamaño | Retención (`BACKUP_RETENTION`), ciclo de vida a clase fría |
-| Registros (ingesta + retención) | Logs verbosos, retención larga | Nivel `info`, retención corta, muestreo |
-| Transferencia de salida (*egress*) | Consultas desde fuera de la nube, copias entre regiones | Misma región, respuestas pequeñas |
+| Cómputo (vCPU/memoria × horas × réplicas) | Más réplicas, más tamaño, más horas encendido | Mínimo de réplicas, límites, apagar tras la prueba |
+| Balanceador (horas + tráfico procesado) | Siempre activo | Uno solo, retirarlo al terminar |
+| Almacenamiento de datos | Tamaño y operaciones | Datos pequeños, clase mínima |
+| Respaldos (GB-mes, operaciones, transferencia) | Frecuencia × retención × tamaño | Retención limitada, ciclo de vida |
+| Registros (ingesta + retención) | Logs verbosos, retención larga | Nivel adecuado, retención corta |
+| Transferencia de salida | Consultas desde fuera, copias entre regiones | Misma región |
 | Registro de imágenes | Número y tamaño de imágenes | Imagen mínima, borrar versiones viejas |
 
-## Limpieza al usar cuentas educativas
-
-Revise los límites de la cuenta, etiquete todos los recursos como `proyecto=nodoruta-hackaton` y elimínelos al terminar (un único grupo de
-recursos / *stack* facilita borrarlos de una vez).
+Etiquete todo lo creado como `proyecto=nodoruta` y elimínelo al terminar. Revise los límites de la cuenta educativa antes de crear nada.
