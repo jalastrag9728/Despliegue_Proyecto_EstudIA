@@ -1,5 +1,7 @@
 .git
 .github
+venv
+.venv
 data
 respaldos
 evidencias
@@ -8,4 +10,6 @@ tests
 scripts
 proxy
 *.md
+*.pyc
+db.sqlite3
 __pycache__

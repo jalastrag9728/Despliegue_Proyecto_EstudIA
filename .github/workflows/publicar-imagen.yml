@@ -24,7 +24,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/build-push-action@v6
         with:
-          context: ./app
+          context: .
           push: true
           tags: |
             ${{ env.IMAGEN }}:${{ github.ref_name }}

@@ -15,5 +15,7 @@ evidencias/*
 
 __pycache__/
 *.pyc
+venv/
+.venv/
 .vscode/
 .idea/

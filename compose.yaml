@@ -14,6 +14,8 @@ x-app: &app
   init: true                       # el proceso principal recibe bien la senal de apagado (docker stop no espera 10 s)
   stop_grace_period: 3s
   read_only: true                  # el sistema de archivos del contenedor no se puede modificar
+  tmpfs:
+    - /tmp                         # directorio temporal en memoria para Gunicorn
   cap_drop: [ALL]                  # sin privilegios especiales de Linux
   security_opt: ["no-new-privileges:true"]
   mem_limit: 128m                  # limites de consumo (controlan costo y evitan abusos)
