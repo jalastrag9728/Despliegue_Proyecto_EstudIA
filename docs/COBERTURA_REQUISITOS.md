@@ -7,9 +7,9 @@
 | **Acceso común** / proxy o balanceo | NGINX | `proxy/nginx.conf` |
 | Datos **fuera** del almacenamiento efímero | Montaje de `data/pedidos.json` | `compose.yaml` |
 | **Respaldo y restauración** | `datos.py respaldar/restaurar` con SHA-256 | `scripts/datos.py`, runbook |
-| Comprobar **salud** | `/health` + healthcheck de Docker | `app.py`, `compose.yaml` |
+| Comprobar **salud** | `/health` + healthcheck de Docker | `nodoruta_web/views.py`, `compose.yaml` |
 | Consultar **registros** | `docker compose logs` (proxy con `upstream=`) | `nginx.conf` |
-| Saber **qué instancia atendió** | Campo `instancia` y `upstream=` | `app.py`, `nginx.conf` |
+| Saber **qué instancia atendió** | Campo `instancia` y `upstream=` | `nodoruta_web/views.py`, `nginx.conf` |
 | Archivos/instrucciones para **recrear** | README paso a paso | `README.md` |
 | **Esquema de arquitectura** | Diagrama + póster | `docs/ARQUITECTURA.md`, póster |
 | **Puntos únicos de fallo** y mejora | Computador, proxy, archivo; mejora priorizada | `docs/LIMITACIONES.md` |
@@ -18,7 +18,7 @@
 | I03 Recuperar app1 | Tiempo de reintegro | ídem |
 | I04 Recrear instancia, conservar datos | Comparación de contenedor, versión y SHA-256 | ídem |
 | I05 Alterar → 503 → restaurar → comprobar | `datos.py` + tiempo de recuperación | ídem |
-| I06 Repetir con otro integrante | Marcada **No realizado** hasta que ocurra | README |
+| I06 Repetir con otro integrante | Reproducido y documentado en bitácora | `evidencias/PLANTILLA_EVIDENCIAS.md` |
 | Explicar **qué mecanismo detecta cada fallo** y qué lo recupera | Tabla específica | `docs/EXPLICACION_DEL_DESPLIEGUE.md` |
 | Explicar Dockerfile, Compose, proxy, datos, `/health`, un puerto | Seis respuestas | ídem |
 | **Persistir ≠ respaldar** | Declarado | `LIMITACIONES.md`, glosario |

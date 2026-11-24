@@ -21,8 +21,8 @@ jobs:
         run: pip install -r requirements.txt
       - name: Pruebas locales (sin Docker)
         run: python -m unittest discover -s tests -v
-      - name: Sintaxis de scripts
-        run: python -m py_compile app.py scripts/datos.py scripts/verificar_servicio.py scripts/ejecutar_local.py scripts/pruebas_automaticas.py
+      - name: Sintaxis de scripts y app Django
+        run: python -m py_compile app.py manage.py nodoruta_web/*.py scripts/datos.py scripts/verificar_servicio.py scripts/ejecutar_local.py scripts/pruebas_automaticas.py
       - name: Validar compose.yaml
         run: |
           mkdir -p data && cp pedidos.json data/pedidos.json
@@ -49,3 +49,12 @@ jobs:
         with:
           name: evidencias
           path: evidencias/
+      - name: Publicar resumen en GitHub Actions
+        if: always()
+        run: |
+          INFORME=$(find evidencias -name "INFORME.md" | head -n 1 || true)
+          if [ -n "$INFORME" ]; then
+            cat "$INFORME" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No se generó INFORME.md en evidencias/." >> "$GITHUB_STEP_SUMMARY"
+          fi

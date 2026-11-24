@@ -3,7 +3,9 @@ import json
 import os
 from pathlib import Path
 
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
+
+_PANEL_HTML = (Path(__file__).resolve().with_name("panel.html")).read_text(encoding="utf-8")
 
 
 def _instancia():
@@ -66,6 +68,10 @@ def pedidos(_request):
     except (OSError, ValueError, TypeError, AttributeError):
         return _json({"estado": "error_datos", "instancia": inst}, status=503)
     return _json({"instancia": inst, **data})
+
+
+def panel(_request):
+    return HttpResponse(_PANEL_HTML, content_type="text/html; charset=utf-8")
 
 
 def no_encontrado(_request, _ruta=""):

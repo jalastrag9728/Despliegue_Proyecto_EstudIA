@@ -4,32 +4,62 @@
     {
       "id": "PED-001",
       "zona": "Norte",
-      "estado": "En ruta"
+      "estado": "En ruta",
+      "prioridad": "Alta",
+      "vehiculo": "Furgón R-04",
+      "ventana": "09:00 - 11:00",
+      "progreso": 70,
+      "novedad": "En tránsito hacia punto de entrega"
     },
     {
       "id": "PED-002",
       "zona": "Centro",
-      "estado": "Entregado"
+      "estado": "Entregado",
+      "prioridad": "Normal",
+      "vehiculo": "Moto M-12",
+      "ventana": "08:00 - 10:00",
+      "progreso": 100,
+      "novedad": "Entrega confirmada sin novedades"
     },
     {
       "id": "PED-003",
       "zona": "Sur",
-      "estado": "Pendiente"
+      "estado": "Pendiente",
+      "prioridad": "Urgente",
+      "vehiculo": "Por asignar",
+      "ventana": "14:00 - 16:00",
+      "progreso": 15,
+      "novedad": "En cola para salida de tarde"
     },
     {
       "id": "PED-004",
       "zona": "Occidente",
-      "estado": "En ruta"
+      "estado": "En ruta",
+      "prioridad": "Normal",
+      "vehiculo": "Furgón R-07",
+      "ventana": "10:00 - 12:00",
+      "progreso": 55,
+      "novedad": "Tráfico moderado en corredor vial"
     },
     {
       "id": "PED-005",
       "zona": "Oriente",
-      "estado": "Entregado"
+      "estado": "Entregado",
+      "prioridad": "Normal",
+      "vehiculo": "Moto M-09",
+      "ventana": "08:30 - 10:30",
+      "progreso": 100,
+      "novedad": "Entrega completada a tiempo"
     },
     {
       "id": "PED-006",
       "zona": "Centro",
-      "estado": "En preparación"
+      "estado": "En preparación",
+      "prioridad": "Alta",
+      "vehiculo": "Van V-05",
+      "ventana": "11:00 - 13:00",
+      "progreso": 35,
+      "novedad": "Alistamiento en centro de despacho"
     }
   ]
 }

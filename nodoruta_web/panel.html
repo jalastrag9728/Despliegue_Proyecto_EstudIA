@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nodo Ruta · Consulta de Entregas</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-alt: #f1f5f9;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #0f172a;
+      --accent-hover: #1e293b;
+      --ok: #059669;
+      --ok-bg: #ecfdf5;
+      --ok-border: #a7f3d0;
+      --warn: #b45309;
+      --warn-bg: #fffbeb;
+      --warn-border: #fde68a;
+      --info: #2563eb;
+      --info-bg: #eff6ff;
+      --info-border: #bfdbfe;
+      --err: #dc2626;
+      --err-bg: #fef2f2;
+      --err-border: #fecaca;
+      --radius: 12px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .wrap {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 20px 48px;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.3rem;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+    }
+
+    .brand p {
+      margin: 2px 0 0;
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 13px;
+      border-radius: 999px;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .status-pill.ok { background: var(--ok-bg); border-color: var(--ok-border); color: var(--ok); }
+    .status-pill.err { background: var(--err-bg); border-color: var(--err-border); color: var(--err); }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .banner {
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font-size: 0.875rem;
+      color: var(--text);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .banner.ok { background: var(--ok-bg); border-color: var(--ok-border); color: #065f46; }
+    .banner.warn { background: var(--warn-bg); border-color: var(--warn-border); color: #92400e; }
+    .banner.err { background: var(--err-bg); border-color: var(--err-border); color: #991b1b; }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 18px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 0.84rem;
+      font-weight: 500;
+      padding: 8px 13px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.12s ease, border-color 0.12s ease;
+    }
+
+    button:hover { background: var(--surface-alt); border-color: #cbd5e1; }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #ffffff;
+    }
+
+    button.primary:hover { background: var(--accent-hover); }
+
+    button.active {
+      background: var(--info-bg);
+      border-color: var(--info-border);
+      color: var(--info);
+    }
+
+    .spacer { flex: 1; }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+    }
+
+    .kpi-label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .kpi-value {
+      font-family: var(--mono);
+      font-size: 1.2rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .kpi-sub {
+      margin-top: 4px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.45fr 0.95fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .stack { display: flex; flex-direction: column; gap: 16px; }
+
+    .card-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .card-head h2 {
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .card-head span {
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .chip {
+      padding: 5px 11px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      background: var(--surface-alt);
+      border: 1px solid transparent;
+      color: var(--muted);
+    }
+
+    .chip.selected {
+      background: var(--accent);
+      color: #ffffff;
+    }
+
+    .search {
+      margin-left: auto;
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--font);
+      font-size: 0.82rem;
+      min-width: 170px;
+      outline: none;
+    }
+
+    .search:focus { border-color: #94a3b8; }
+
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    th {
+      text-align: left;
+      font-size: 0.74rem;
+      font-weight: 600;
+      color: var(--muted);
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 11px 10px;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    .mono { font-family: var(--mono); font-size: 0.8rem; }
+    .sub-line { font-size: 0.76rem; color: var(--muted); margin-top: 2px; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 500;
+      background: var(--surface-alt);
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .badge.ok { background: var(--ok-bg); color: var(--ok); }
+    .badge.info { background: var(--info-bg); color: var(--info); }
+    .badge.warn { background: var(--warn-bg); color: var(--warn); }
+    .badge.err { background: var(--err-bg); color: var(--err); }
+
+    .progress {
+      width: 72px;
+      height: 6px;
+      background: var(--surface-alt);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: 3px;
+    }
+
+    .progress > i {
+      display: block;
+      height: 100%;
+      background: var(--info);
+      border-radius: 999px;
+    }
+
+    .progress > i.done { background: var(--ok); }
+
+    .empty {
+      padding: 24px 10px;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    pre {
+      margin: 0;
+      padding: 12px 14px;
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 0.76rem;
+      overflow-x: auto;
+      max-height: 240px;
+      line-height: 1.5;
+    }
+
+    .log-list {
+      max-height: 240px;
+      overflow-y: auto;
+    }
+
+    details summary {
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+      list-style: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    details summary::-webkit-details-marker { display: none; }
+    details[open] summary { margin-bottom: 10px; }
+
+    @media (max-width: 920px) {
+      .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid { grid-template-columns: 1fr; }
+      .search { margin-left: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <h1>Nodo Ruta · Consulta de Entregas</h1>
+        <p>Panel operativo para consultar pedidos, verificar balanceo entre servidores y detectar fallos (datos sintéticos)</p>
+      </div>
+      <div id="statusPill" class="status-pill">
+        <span class="dot"></span>
+        <span id="statusText">Esperando consulta</span>
+      </div>
+    </header>
+
+    <div id="banner" class="banner">
+      <span id="bannerMsg">Pulsa «Consultar pedidos» o «Probar balanceo ×10» para ver cómo responden app1 y app2.</span>
+      <span id="bannerMeta" class="mono"></span>
+    </div>
+
+    <div class="toolbar">
+      <button class="primary" onclick="consultar('/pedidos')">Consultar pedidos</button>
+      <button onclick="consultar('/health')">Revisar salud (/health)</button>
+      <button onclick="consultar('/')">Info del servicio (/)</button>
+      <button id="btnRafaga" onclick="rafaga()">Probar balanceo ×10</button>
+      <button id="btnAuto" onclick="toggleAuto()">Monitor en vivo (1s): Off</button>
+      <div class="spacer"></div>
+      <button onclick="limpiar()">Reiniciar contadores</button>
+    </div>
+
+    <section class="kpis">
+      <div class="card">
+        <div class="kpi-label">Servidor que respondió</div>
+        <div id="kpiInstancia" class="kpi-value">—</div>
+        <div id="kpiEndpoint" class="kpi-sub">Sin consultas aún</div>
+      </div>
+      <div class="card">
+        <div class="kpi-label">Respuesta HTTP</div>
+        <div id="kpiHttp" class="kpi-value">—</div>
+        <div id="kpiLatencia" class="kpi-sub">Tiempo: 0 ms</div>
+      </div>
+      <div class="card">
+        <div class="kpi-label">Versión de los datos</div>
+        <div id="kpiVersion" class="kpi-value">—</div>
+        <div id="kpiTotal" class="kpi-sub">0 pedidos cargados</div>
+      </div>
+      <div class="card">
+        <div class="kpi-label">Reparto entre instancias</div>
+        <div id="kpiReparto" class="kpi-value">—</div>
+        <div id="kpiConsultas" class="kpi-sub">0 consultas totales</div>
+      </div>
+    </section>
+
+    <main class="grid">
+      <section class="card">
+        <div class="card-head">
+          <h2>Estado de entregas</h2>
+          <span id="pedidosMeta">/pedidos</span>
+        </div>
+
+        <div class="filters">
+          <button class="chip selected" data-filtro="Todos" onclick="setFiltro('Todos', this)">Todos</button>
+          <button class="chip" data-filtro="En ruta" onclick="setFiltro('En ruta', this)">En ruta</button>
+          <button class="chip" data-filtro="Entregado" onclick="setFiltro('Entregado', this)">Entregados</button>
+          <button class="chip" data-filtro="Pendiente" onclick="setFiltro('Pendiente', this)">Pendientes / Prep.</button>
+          <input id="buscador" class="search" type="search" placeholder="Buscar pedido o zona..." oninput="renderPedidos()">
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Pedido</th>
+                <th>Zona y vehículo</th>
+                <th>Estado</th>
+                <th>Avance</th>
+                <th>Ventana</th>
+              </tr>
+            </thead>
+            <tbody id="tablaPedidos">
+              <tr><td colspan="5" class="empty">Cargando entregas...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="stack">
+        <section class="card">
+          <div class="card-head">
+            <h2>Historial de pruebas</h2>
+            <span id="logCount">0 eventos</span>
+          </div>
+          <div class="log-list">
+            <table>
+              <thead>
+                <tr>
+                  <th>Hora</th>
+                  <th>Ruta</th>
+                  <th>HTTP</th>
+                  <th>Instancia</th>
+                  <th>ms</th>
+                </tr>
+              </thead>
+              <tbody id="tablaLog">
+                <tr><td colspan="5" class="empty">Sin eventos aún.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <details open>
+            <summary>
+              <span>Respuesta técnica (JSON)</span>
+              <span id="jsonRuta" class="mono" style="color: var(--muted); font-weight: 400;">—</span>
+            </summary>
+            <pre id="jsonOut">{}</pre>
+          </details>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const conteo = {};
+    const historial = [];
+    let pedidosActuales = [];
+    let filtroActual = "Todos";
+    let totalConsultas = 0;
+    let timerAuto = null;
+
+    function badgeEstadoPedido(estado) {
+      const e = (estado || "").toLowerCase();
+      if (e.includes("entregado")) return "ok";
+      if (e.includes("ruta")) return "info";
+      return "warn";
+    }
+
+    function badgePrioridad(prioridad) {
+      const p = (prioridad || "").toLowerCase();
+      if (p === "urgente") return "err";
+      if (p === "alta") return "warn";
+      return "";
+    }
+
+    function setFiltro(valor, boton) {
+      filtroActual = valor;
+      document.querySelectorAll(".chip").forEach((c) => c.classList.remove("selected"));
+      boton.classList.add("selected");
+      renderPedidos();
+    }
+
+    function actualizarBanner(ok, status) {
+      const banner = document.getElementById("banner");
+      const msg = document.getElementById("bannerMsg");
+      const meta = document.getElementById("bannerMeta");
+
+      if (!ok) {
+        banner.className = "banner err";
+        if (status === 503) {
+          msg.textContent = "Fallo en los datos (HTTP 503): ninguna instancia puede leer data/pedidos.json. Restaura un respaldo con datos.py restaurar.";
+        } else {
+          msg.textContent = "No hay respuesta del servicio. Verifica que los contenedores estén activos con docker compose ps.";
+        }
+        meta.textContent = `HTTP ${status}`;
+        return;
+      }
+
+      const activas = Object.keys(conteo).filter((k) => k !== "sin-id");
+      if (activas.length >= 2) {
+        banner.className = "banner ok";
+        msg.textContent = `Servicio operativo: NGINX está repartiendo consultas entre ${activas.sort().join(" y ")}.`;
+        meta.textContent = "Balanceo activo";
+      } else if (activas.length === 1 && totalConsultas >= 3) {
+        banner.className = "banner warn";
+        msg.textContent = `Contingencia activa: solo está respondiendo ${activas[0]}, pero el servicio sigue disponible sin caer.`;
+        meta.textContent = "1 instancia activa";
+      } else {
+        banner.className = "banner ok";
+        msg.textContent = "Servicio operativo. Pulsa «Probar balanceo ×10» para comprobar que responden ambas instancias.";
+        meta.textContent = "HTTP 200";
+      }
+    }
+
+    function actualizarReparto() {
+      const partes = Object.entries(conteo)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([k, v]) => `${k}:${v}`);
+      document.getElementById("kpiReparto").textContent = partes.length ? partes.join(" · ") : "—";
+      document.getElementById("kpiConsultas").textContent = `${totalConsultas} consultas totales`;
+    }
+
+    function renderPedidos() {
+      const tbody = document.getElementById("tablaPedidos");
+      const q = (document.getElementById("buscador").value || "").trim().toLowerCase();
+
+      const filtrados = pedidosActuales.filter((p) => {
+        const estado = (p.estado || "").toLowerCase();
+        const pasaFiltro =
+          filtroActual === "Todos" ||
+          (filtroActual === "Pendiente"
+            ? estado.includes("pendiente") || estado.includes("preparaci")
+            : estado === filtroActual.toLowerCase());
+        const texto = `${p.id || ""} ${p.zona || ""} ${p.vehiculo || ""} ${p.novedad || ""}`.toLowerCase();
+        return pasaFiltro && (!q || texto.includes(q));
+      });
+
+      if (!filtrados.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">No hay entregas que coincidan con el filtro.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtrados.map((p) => {
+        const pct = Number.isFinite(p.progreso) ? Math.max(0, Math.min(100, p.progreso)) : (p.estado === "Entregado" ? 100 : 40);
+        const prio = p.prioridad ? `<span class="badge ${badgePrioridad(p.prioridad)}" style="margin-left:6px">${p.prioridad}</span>` : "";
+        return `
+          <tr>
+            <td>
+              <div class="mono" style="font-weight:600">${p.id ?? "—"}${prio}</div>
+              <div class="sub-line">${p.novedad ?? ""}</div>
+            </td>
+            <td>
+              <div>${p.zona ?? "—"}</div>
+              <div class="sub-line">${p.vehiculo ?? "Unidad asignada"}</div>
+            </td>
+            <td><span class="badge ${badgeEstadoPedido(p.estado)}">${p.estado ?? "—"}</span></td>
+            <td>
+              <div class="progress"><i class="${pct === 100 ? "done" : ""}" style="width:${pct}%"></i></div>
+              <span class="mono" style="font-size:0.72rem; color:var(--muted)">${pct}%</span>
+            </td>
+            <td class="mono">${p.ventana ?? "—"}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function renderHistorial() {
+      const tbody = document.getElementById("tablaLog");
+      document.getElementById("logCount").textContent = `${historial.length} eventos`;
+      if (!historial.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">Sin eventos aún.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = historial.map((item) => `
+        <tr>
+          <td class="mono">${item.hora}</td>
+          <td class="mono">${item.ruta}</td>
+          <td><span class="badge ${item.ok ? "ok" : "err"}">${item.status}</span></td>
+          <td class="mono">${item.instancia}</td>
+          <td class="mono">${item.ms}</td>
+        </tr>
+      `).join("");
+    }
+
+    async function consultar(ruta) {
+      const inicio = performance.now();
+      const hora = new Date().toLocaleTimeString("es-CO", { hour12: false });
+      const pill = document.getElementById("statusPill");
+      const statusText = document.getElementById("statusText");
+
+      try {
+        const res = await fetch(ruta, { cache: "no-store" });
+        const ms = Math.round(performance.now() - inicio);
+        let data = {};
+        try { data = await res.json(); } catch (_) { data = { error: "Respuesta no JSON" }; }
+
+        const instancia = data.instancia || "sin-id";
+        totalConsultas += 1;
+        conteo[instancia] = (conteo[instancia] || 0) + 1;
+
+        document.getElementById("kpiInstancia").textContent = instancia;
+        document.getElementById("kpiEndpoint").textContent = `Ruta: GET ${ruta}`;
+        document.getElementById("kpiHttp").textContent = `${res.status}`;
+        document.getElementById("kpiLatencia").textContent = `Tiempo: ${ms} ms`;
+
+        if (data.version || data.version_datos) {
+          document.getElementById("kpiVersion").textContent = data.version || data.version_datos;
+        }
+
+        if (Array.isArray(data.pedidos)) {
+          pedidosActuales = data.pedidos;
+          document.getElementById("kpiTotal").textContent = `${data.pedidos.length} pedidos cargados`;
+          document.getElementById("pedidosMeta").textContent = data.version ? `versión ${data.version}` : "/pedidos";
+          renderPedidos();
+        } else if (!res.ok && ruta === "/pedidos") {
+          pedidosActuales = [];
+          document.getElementById("tablaPedidos").innerHTML =
+            '<tr><td colspan="5" class="empty">Servicio con error de datos (HTTP ' + res.status + '). Revisa /health o restaura un respaldo.</td></tr>';
+        }
+
+        pill.className = "status-pill " + (res.ok ? "ok" : "err");
+        statusText.textContent = res.ok ? `Operativo · HTTP ${res.status}` : `Alerta · HTTP ${res.status}`;
+
+        document.getElementById("jsonRuta").textContent = `GET ${ruta} · HTTP ${res.status}`;
+        document.getElementById("jsonOut").textContent = JSON.stringify(data, null, 2);
+
+        historial.unshift({ hora, ruta, status: res.status, instancia, ms, ok: res.ok });
+        if (historial.length > 20) historial.pop();
+        actualizarReparto();
+        actualizarBanner(res.ok, res.status);
+        renderHistorial();
+      } catch (err) {
+        const ms = Math.round(performance.now() - inicio);
+        pill.className = "status-pill err";
+        statusText.textContent = "Sin conexión";
+        document.getElementById("kpiHttp").textContent = "ERR";
+        document.getElementById("kpiLatencia").textContent = `Tiempo: ${ms} ms`;
+        document.getElementById("jsonOut").textContent = JSON.stringify({ error: String(err) }, null, 2);
+        historial.unshift({ hora, ruta, status: "ERR", instancia: "—", ms, ok: false });
+        if (historial.length > 20) historial.pop();
+        actualizarBanner(false, "ERR");
+        renderHistorial();
+      }
+    }
+
+    async function rafaga() {
+      const btn = document.getElementById("btnRafaga");
+      btn.disabled = true;
+      for (let i = 0; i < 10; i++) {
+        await consultar("/pedidos");
+      }
+      btn.disabled = false;
+    }
+
+    function toggleAuto() {
+      const btn = document.getElementById("btnAuto");
+      if (timerAuto) {
+        clearInterval(timerAuto);
+        timerAuto = null;
+        btn.classList.remove("active");
+        btn.textContent = "Monitor en vivo (1s): Off";
+      } else {
+        consultar("/pedidos");
+        timerAuto = setInterval(() => consultar("/pedidos"), 1000);
+        btn.classList.add("active");
+        btn.textContent = "Monitor en vivo (1s): On";
+      }
+    }
+
+    function limpiar() {
+      for (const k of Object.keys(conteo)) delete conteo[k];
+      historial.length = 0;
+      totalConsultas = 0;
+      document.getElementById("kpiInstancia").textContent = "—";
+      document.getElementById("kpiEndpoint").textContent = "Sin consultas aún";
+      document.getElementById("kpiHttp").textContent = "—";
+      document.getElementById("kpiLatencia").textContent = "Tiempo: 0 ms";
+      document.getElementById("jsonRuta").textContent = "—";
+      document.getElementById("jsonOut").textContent = "{}";
+      actualizarReparto();
+      renderHistorial();
+    }
+
+    consultar("/pedidos");
+  </script>
+</body>
+</html>
