@@ -67,3 +67,9 @@ class PruebasDjango(unittest.TestCase):
         self.work.write_text("{ json roto", encoding="utf-8")
         self.assertEqual(self.client.get("/health").status_code, 503)
         self.assertEqual(self.client.get("/pedidos").status_code, 503)
+
+    def test_panel_html(self):
+        r = self.client.get("/panel")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("text/html", r["Content-Type"])
+        self.assertIn("Nodo Ruta", r.content.decode("utf-8"))

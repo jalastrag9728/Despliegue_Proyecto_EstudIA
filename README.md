@@ -4,7 +4,9 @@
 
 Este repositorio levanta un servicio web con **dos instancias** detrás de **un único punto de acceso**, con los datos **fuera del contenedor**
 y con un procedimiento de **respaldo y restauración** probado. Está pensado para quien **no es experto en nube**: no necesita cuentas de
-proveedor ni pagar nada. Se construye sobre el paquete del reto (`app.py`, `pedidos.json` y los scripts de `scripts/` **no se modificaron**).
+proveedor ni pagar nada. Se construye sobre el paquete del reto (`app.py`, `pedidos.json` y los scripts originales de `scripts/` se conservan
+sin cambios como referencia) y evoluciona el servidor a **Django + Gunicorn** (`nodoruta_web/`) manteniendo exactamente el mismo contrato HTTP
+(`/`, `/health` y `/pedidos`).
 
 ---
 
@@ -45,7 +47,7 @@ docker compose up -d --build              # 2. construye y levanta (la 1.ª vez 
 docker compose ps                         # 3. espere a ver app1 y app2 en "healthy"
 ```
 
-Abra <http://127.0.0.1:8080/health> y <http://127.0.0.1:8080/pedidos>. Refresque varias veces: el campo **`instancia`** alterna entre `app1` y `app2`.
+Abra <http://127.0.0.1:8080/health> y <http://127.0.0.1:8080/pedidos> (o el panel visual en <http://127.0.0.1:8080/panel>). Refresque varias veces: el campo **`instancia`** alterna entre `app1` y `app2`.
 Todo lo anterior queda reproducible desde `compose.yaml`, `Dockerfile` y `proxy/nginx.conf`.
 
 > Windows PowerShell: use `curl.exe` (con `.exe`) y `py` si `python` no existe.
@@ -84,19 +86,23 @@ El salto a la nube, pieza por pieza: [`docs/NUBE_EQUIVALENTE.md`](docs/NUBE_EQUI
 ## 6. Qué hay en cada carpeta
 
 ```
-nodoruta-mvp/
-├─ app.py  pedidos.json            <- ORIGINALES del reto (sin cambios)
-├─ Dockerfile                      <- imagen de la app (usuario sin privilegios)
-├─ compose.yaml                    <- el "plano": app1, app2 y proxy
+Despliegue_Proyecto_EstudIA/
+├─ app.py  pedidos.json            <- ORIGINALES del reto (referencia sin cambios)
+├─ manage.py  nodoruta_web/        <- servicio web en Django (mismo contrato /, /health, /pedidos)
+├─ requirements.txt                <- dependencias Python (Django + Gunicorn)
+├─ Dockerfile                      <- imagen Django + Gunicorn (usuario sin privilegios)
+├─ compose.yaml                    <- el "plano": app1, app2 y proxy NGINX
 ├─ proxy/nginx.conf                <- reparto, reintentos, DNS dinámico y registro
 ├─ scripts/
 │  ├─ datos.py  ejecutar_local.py  verificar_servicio.py   <- ORIGINALES del reto (sin cambios)
 │  └─ pruebas_automaticas.py       <- I01-I05 + tiempos + informe (nuevo)
-├─ tests/test_kit.py               <- pruebas locales sin Docker
+├─ tests/
+│  ├─ test_kit.py                  <- pruebas locales del kit original sin Docker
+│  └─ test_django.py               <- pruebas unitarias de la app Django sin Docker
 ├─ data/                           <- copia de trabajo (se crea con "preparar"; fuera de git)
 ├─ respaldos/   evidencias/        <- copias de seguridad y resultados (fuera de git)
 ├─ docs/                           <- arquitectura, explicación del despliegue, nube, seguridad, límites, runbook, plan
-└─ .github/workflows/ci.yml        <- validación y pruebas automáticas
+└─ .github/workflows/              <- CI (validación + I01-I05 reales) y publicación opcional a GHCR
 ```
 
 ## 7. Si no puede usar Docker

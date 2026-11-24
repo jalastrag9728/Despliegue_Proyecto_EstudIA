@@ -4,7 +4,7 @@
 
 | Pregunta | Respuesta |
 |---|---|
-| **¿Qué construye el Dockerfile?** | La imagen `nodo-ruta-app`: Python 3.12 slim + `app.py`, corre como usuario sin privilegios (UID 10001) y escucha en el puerto 8080 **del contenedor**. No contiene los datos ni secretos. |
+| **¿Qué construye el Dockerfile?** | La imagen `nodo-ruta-app`: Python 3.12 slim + **Django + Gunicorn** (`nodoruta_web/`, 2 workers), corre como usuario sin privilegios (UID 10001) y escucha en el puerto 8080 **del contenedor**. No contiene los datos ni secretos. |
 | **¿Qué conecta Compose?** | Crea una red interna con `app1`, `app2` y `proxy`; monta `data/pedidos.json` (solo lectura) en las apps; define el healthcheck y el orden de arranque (`proxy` espera a que ambas apps estén *healthy*). |
 | **¿Para qué sirve el proxy?** | Es el único punto de entrada. Reparte por turnos, reintenta en la otra instancia ante errores de conexión o demora, y registra qué *upstream* atendió. |
 | **¿Dónde se leen los datos?** | En **cada consulta**, de `/data/pedidos.json` dentro del contenedor, que es el archivo `data/pedidos.json` del computador montado en solo lectura. Por eso una alteración o una restauración se ven al instante, sin reiniciar. |
@@ -32,5 +32,5 @@ instancias. Reintentarlo no sirve, ocultaría el problema y dejaría a ambas ins
 | Compose con `app1`/`app2` explícitas | Los IDs coinciden con las pruebas I01-I05 y el código es fácil de leer | `replicas`: más compacto, pero IDs menos legibles |
 | Archivo montado (no volumen) | Es lo que usa `datos.py`; se ve y se edita desde el computador | Volumen de Docker: más "limpio", menos visible para principiantes |
 | `datos.py` en el computador (no en un contenedor) | Menos piezas; el respaldo queda fuera de Docker | Contenedor `ops`: más aislado |
-| Servidor HTTP de la biblioteca estándar | Es el de la app del reto; **solo para laboratorio** | Gunicorn/uvicorn en producción |
+| Django + Gunicorn (2 workers) en contenedor | Supera la limitación de `http.server` (solo laboratorio) manteniendo intacto el contrato `/`, `/health`, `/pedidos` | `app.py` (stdlib): más liviano, pero monohilo y no apto para producción |
 | `init: true` | Python como proceso principal ignora la señal de apagado: sin esto `docker stop` espera 10 s y se acaba matando | - |
