@@ -79,3 +79,80 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+
+  # Herramientas de datos (respaldar/restaurar/alterar/listar). NO arranca con "up".
+  #   docker compose run --rm ops status | backup | list | restore [archivo] | tamper
+  # Reutiliza la imagen de la app (trae sh, sha256sum, sed, date). Monta los datos en
+  # LECTURA/ESCRITURA (a diferencia de app1/app2, que son solo lectura) y la carpeta de
+  # respaldos del host. tamper es SOLO para pruebas (simula datos danados).
+  ops:
+    image: nodo-ruta-app:local
+    build:
+      context: .
+    profiles: ["tools"]
+    entrypoint: ["sh", "/scripts/ops.sh"]
+    environment:
+      DATA_DIR: /data
+      BACKUP_DIR: /respaldos
+      BACKUP_RETENTION: ${BACKUP_RETENTION:-10}
+    volumes:
+      - type: bind
+        source: ./data/pedidos.json     # misma copia de trabajo que leen app1/app2
+        target: /data/pedidos.json
+        read_only: false                # ops SI escribe (backup/restore/tamper)
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./respaldos             # los respaldos salen a la carpeta del host
+        target: /respaldos
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./scripts/ops.sh
+        target: /scripts/ops.sh
+        read_only: true
+        bind:
+          create_host_path: false
+    security_opt: ["no-new-privileges:true"]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # Respaldo automatico periodico (opcional):
+  #   docker compose --profile auto up -d respaldo-automatico
+  # Lee los datos en SOLO LECTURA: un respaldo nunca modifica el archivo de origen.
+  respaldo-automatico:
+    image: nodo-ruta-app:local
+    build:
+      context: .
+    profiles: ["auto"]
+    restart: unless-stopped
+    entrypoint: ["sh", "/scripts/ops.sh", "auto"]
+    environment:
+      DATA_DIR: /data
+      BACKUP_DIR: /respaldos
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-300}
+      BACKUP_RETENTION: ${BACKUP_RETENTION:-10}
+    volumes:
+      - type: bind
+        source: ./data/pedidos.json
+        target: /data/pedidos.json
+        read_only: true                 # solo lectura: el respaldo no toca el origen
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./respaldos
+        target: /respaldos
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./scripts/ops.sh
+        target: /scripts/ops.sh
+        read_only: true
+        bind:
+          create_host_path: false
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 64m
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

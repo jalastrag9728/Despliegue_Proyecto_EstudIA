@@ -1,6 +1,6 @@
 #!/bin/sh
 # Operaciones de datos: respaldar, alterar (solo para pruebas), restaurar y verificar.
-# Se ejecuta DENTRO de un contenedor (servicio "ops" de docker-compose.yml):
+# Se ejecuta DENTRO de un contenedor (servicio "ops" de compose.yaml):
 #   docker compose run --rm ops backup | tamper | restore [archivo] | status | list | auto
 # Salida legible por personas y por el script de pruebas (líneas CLAVE=valor).
 set -eu
@@ -10,7 +10,7 @@ BACKUP_DIR="${BACKUP_DIR:-/respaldos}"
 ARCHIVO="${DATA_DIR}/pedidos.json"
 RETENCION="${BACKUP_RETENTION:-10}"
 
-version_de() { grep -o '"version_datos": *"[^"]*"' "$1" | head -n1 | sed 's/.*: *"\(.*\)"/\1/'; }
+version_de() { grep -o '"version": *"[^"]*"' "$1" | head -n1 | sed 's/.*: *"\(.*\)"/\1/'; }
 hash_de()    { sha256sum "$1" | cut -d' ' -f1; }
 
 cmd_status() {
@@ -39,7 +39,12 @@ cmd_backup() {
 cmd_tamper() {
   # SOLO PARA PRUEBAS: simula una pérdida/modificación de la copia de trabajo.
   [ -f "$ARCHIVO" ] || { echo "ERROR=no existe $ARCHIVO"; exit 1; }
-  sed -i 's/"version_datos": *"[^"]*"/"version_datos": "ALTERADO"/; s/"Entregado"/"PERDIDO"/' "$ARCHIVO"
+  # El archivo de datos se monta SOLO (no su carpeta), asi que no se puede crear un
+  # temporal junto a el: se edita en /tmp (escribible) y se copia el contenido de vuelta.
+  tmp="$(mktemp)"
+  sed 's/"version": *"[^"]*"/"version": "ALTERADO"/; s/"Entregado"/"PERDIDO"/' "$ARCHIVO" > "$tmp"
+  cat "$tmp" > "$ARCHIVO"
+  rm -f "$tmp"
   echo "ALTERADO=si"
   echo "VERSION=$(version_de "$ARCHIVO")"
   echo "SHA256=$(hash_de "$ARCHIVO")"
@@ -60,9 +65,13 @@ cmd_restore() {
   else
     echo "AVISO=el respaldo no tiene archivo .sha256; no se pudo verificar integridad"
   fi
-  # 2) Copiar a un temporal y renombrar: el cambio es atómico (nunca se ve un archivo a medias)
-  cp "$origen" "$ARCHIVO.tmp"
-  mv "$ARCHIVO.tmp" "$ARCHIVO"
+  # 2) El archivo de datos se monta SOLO (no su carpeta), asi que no se puede renombrar
+  #    un temporal encima. Se valida en /tmp y se vuelca el contenido sobre el archivo
+  #    montado de una sola escritura (cat), que es lo mas atomico posible en este montaje.
+  tmp="$(mktemp)"
+  cp "$origen" "$tmp"
+  cat "$tmp" > "$ARCHIVO"
+  rm -f "$tmp"
   echo "RESTORED_FROM=$(basename "$origen")"
   echo "VERSION=$(version_de "$ARCHIVO")"
   echo "SHA256=$(hash_de "$ARCHIVO")"
