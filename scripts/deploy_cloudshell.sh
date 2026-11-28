@@ -21,7 +21,7 @@ set -euo pipefail
 AWS_REGION="${AWS_REGION:-us-east-1}"
 PROJECT="${PROJECT_NAME:-nodoruta}"
 INSTANCE_TYPE="${INSTANCE_TYPE:-t3.micro}"
-GIT_REPO_URL="${GIT_REPO_URL:-https://github.com/tu-usuario/Despliegue_Proyecto_EstudIA.git}"
+GIT_REPO_URL="${GIT_REPO_URL:-https://github.com/jalastrag9728/Despliegue_Proyecto_EstudIA.git}"
 GIT_BRANCH="${GIT_BRANCH:-dev}"
 DB_NAME="${DB_NAME:-nodoruta}"
 DB_USER="${DB_USER:-nodoruta_admin}"
@@ -161,15 +161,16 @@ fi
 APP_USER_DATA=$(cat <<EOF
 #!/bin/bash
 set -euxo pipefail
-dnf update -y
 dnf install -y docker git
 systemctl enable --now docker
 usermod -aG docker ec2-user
 
-mkdir -p /usr/local/lib/docker/cli-plugins
+mkdir -p /usr/local/lib/docker/cli-plugins /usr/libexec/docker/cli-plugins
 curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
   -o /usr/local/lib/docker/cli-plugins/docker-compose
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+cp /usr/local/lib/docker/cli-plugins/docker-compose /usr/libexec/docker/cli-plugins/docker-compose
+ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
 
 rm -rf /home/ec2-user/nodoruta
 git clone --branch "${GIT_BRANCH}" "${GIT_REPO_URL}" /home/ec2-user/nodoruta || \
@@ -187,7 +188,7 @@ DB_SSLMODE=require
 ENVEOF
 
 chown -R ec2-user:ec2-user /home/ec2-user/nodoruta
-docker compose -f compose.aws.yaml up -d --build
+/usr/local/bin/docker-compose -f compose.aws.yaml up -d --build
 EOF
 )
 
@@ -211,7 +212,6 @@ echo "[OK] EC2 #2 (App en Subred Privada) en ejecucion: ID=$EC2_APP_ID | IP Priv
 PROXY_USER_DATA=$(cat <<EOF
 #!/bin/bash
 set -euxo pipefail
-dnf update -y
 dnf install -y docker
 systemctl enable --now docker
 usermod -aG docker ec2-user

@@ -64,7 +64,7 @@ variable "key_name" {
 variable "git_repo_url" {
   description = "URL HTTPS del repositorio Git que clonara la EC2 privada para construir la imagen con Docker Compose"
   type        = string
-  default     = "https://github.com/tu-usuario/Despliegue_Proyecto_EstudIA.git"
+  default     = "https://github.com/jalastrag9728/Despliegue_Proyecto_EstudIA.git"
 }
 
 variable "git_branch" {
@@ -369,22 +369,24 @@ resource "aws_instance" "app_ec2" {
   subnet_id                   = aws_subnet.private_a.id
   vpc_security_group_ids      = [aws_security_group.app_sg.id]
   associate_public_ip_address = false
+  user_data_replace_on_change = true
   key_name                    = var.key_name != "" ? var.key_name : null
 
   user_data = <<-EOF
     #!/bin/bash
     set -euxo pipefail
 
-    dnf update -y
     dnf install -y docker git
     systemctl enable --now docker
     usermod -aG docker ec2-user
 
-    # Instalar plugin Docker Compose v2
-    mkdir -p /usr/local/lib/docker/cli-plugins
+    # Instalar plugin Docker Compose v2 en todas las rutas estandar de AL2023
+    mkdir -p /usr/local/lib/docker/cli-plugins /usr/libexec/docker/cli-plugins
     curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
       -o /usr/local/lib/docker/cli-plugins/docker-compose
     chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+    cp /usr/local/lib/docker/cli-plugins/docker-compose /usr/libexec/docker/cli-plugins/docker-compose
+    ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
 
     # Clonar el repositorio usando la salida por NAT Gateway (soporta rama dev o main con fallback)
     rm -rf /home/ec2-user/nodoruta
@@ -400,13 +402,13 @@ resource "aws_instance" "app_ec2" {
     DB_NAME=${var.db_name}
     DB_USER=${var.db_username}
     DB_PASSWORD=${var.db_password}
-    DB_SSLMODE=require
+    DB_SSLMODE=prefer
     ENVEOF
 
     chown -R ec2-user:ec2-user /home/ec2-user/nodoruta
 
     # Construir imagen, migrar semilla a RDS PostgreSQL y levantar app1 (:8081) y app2 (:8082)
-    docker compose -f compose.aws.yaml up -d --build
+    /usr/local/bin/docker-compose -f compose.aws.yaml up -d --build
   EOF
 
   depends_on = [
@@ -430,13 +432,13 @@ resource "aws_instance" "proxy_ec2" {
   subnet_id                   = aws_subnet.public.id
   vpc_security_group_ids      = [aws_security_group.proxy_sg.id]
   associate_public_ip_address = true
+  user_data_replace_on_change = true
   key_name                    = var.key_name != "" ? var.key_name : null
 
   user_data = <<-EOF
     #!/bin/bash
     set -euxo pipefail
 
-    dnf update -y
     dnf install -y docker
     systemctl enable --now docker
     usermod -aG docker ec2-user
