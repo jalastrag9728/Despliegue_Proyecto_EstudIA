@@ -13,8 +13,6 @@
 name: nodo-ruta-aws
 
 x-app: &app
-  build:
-    context: .
   image: nodo-ruta-app:aws
   restart: unless-stopped
   init: true
@@ -48,6 +46,8 @@ x-app: &app
 services:
   migrador-rds:
     <<: *app
+    build:
+      context: .
     restart: "no"
     healthcheck:
       disable: true
@@ -55,9 +55,6 @@ services:
 
   app1:
     <<: *app
-    depends_on:
-      migrador-rds:
-        condition: service_completed_successfully
     ports:
       - "8081:8080"
     environment:
@@ -66,9 +63,6 @@ services:
 
   app2:
     <<: *app
-    depends_on:
-      migrador-rds:
-        condition: service_completed_successfully
     ports:
       - "8082:8080"
     environment:

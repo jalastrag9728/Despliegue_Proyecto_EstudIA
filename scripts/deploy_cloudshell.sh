@@ -161,16 +161,29 @@ fi
 APP_USER_DATA=$(cat <<EOF
 #!/bin/bash
 set -euxo pipefail
+export HOME=/root
+
 dnf install -y docker git
 systemctl enable --now docker
 usermod -aG docker ec2-user
 
-mkdir -p /usr/local/lib/docker/cli-plugins /usr/libexec/docker/cli-plugins
-curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
-  -o /usr/local/lib/docker/cli-plugins/docker-compose
-chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
-cp /usr/local/lib/docker/cli-plugins/docker-compose /usr/libexec/docker/cli-plugins/docker-compose
-ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
+mkdir -p /usr/local/lib/docker/cli-plugins /usr/libexec/docker/cli-plugins /root/.docker/cli-plugins
+curl -fSL "https://github.com/docker/buildx/releases/download/v0.20.1/buildx-v0.20.1.linux-amd64" \
+  -o /usr/local/lib/docker/cli-plugins/docker-buildx || true
+if [ -f /usr/local/lib/docker/cli-plugins/docker-buildx ]; then
+  chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
+  cp /usr/local/lib/docker/cli-plugins/docker-buildx /usr/libexec/docker/cli-plugins/docker-buildx
+  cp /usr/local/lib/docker/cli-plugins/docker-buildx /root/.docker/cli-plugins/docker-buildx
+fi
+
+curl -fSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose || true
+if [ -f /usr/local/lib/docker/cli-plugins/docker-compose ]; then
+  chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+  cp /usr/local/lib/docker/cli-plugins/docker-compose /usr/libexec/docker/cli-plugins/docker-compose
+  cp /usr/local/lib/docker/cli-plugins/docker-compose /root/.docker/cli-plugins/docker-compose
+  ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
+fi
 
 rm -rf /home/ec2-user/nodoruta
 git clone --branch "${GIT_BRANCH}" "${GIT_REPO_URL}" /home/ec2-user/nodoruta || \
@@ -184,11 +197,38 @@ DB_PORT=5432
 DB_NAME=${DB_NAME}
 DB_USER=${DB_USER}
 DB_PASSWORD=${DB_PASSWORD}
-DB_SSLMODE=require
+DB_SSLMODE=prefer
+DJANGO_ALLOWED_HOSTS=*
+DATA_PATH=/app/pedidos.json
 ENVEOF
 
 chown -R ec2-user:ec2-user /home/ec2-user/nodoruta
-/usr/local/bin/docker-compose -f compose.aws.yaml up -d --build
+
+DOCKER_BUILDKIT=0 docker build -t nodo-ruta-app:aws .
+
+docker run --rm --env-file /home/ec2-user/nodoruta/.env nodo-ruta-app:aws \
+  python scripts/datos_rds.py preparar || true
+
+/usr/local/bin/docker-compose -f compose.aws.yaml up -d --no-build || \
+  docker compose -f compose.aws.yaml up -d --no-build || true
+
+if ! docker ps | grep -q '8081->8080'; then
+  docker rm -f nodoruta-app1 nodoruta-app2 || true
+  docker run -d \
+    --name nodoruta-app1 \
+    --restart unless-stopped \
+    --env-file /home/ec2-user/nodoruta/.env \
+    -e INSTANCE_ID=app1 \
+    -p 8081:8080 \
+    nodo-ruta-app:aws
+  docker run -d \
+    --name nodoruta-app2 \
+    --restart unless-stopped \
+    --env-file /home/ec2-user/nodoruta/.env \
+    -e INSTANCE_ID=app2 \
+    -p 8082:8080 \
+    nodo-ruta-app:aws
+fi
 EOF
 )
 
@@ -248,12 +288,12 @@ http {
             proxy_set_header Host \$host;
             proxy_set_header X-Real-IP \$remote_addr;
 
-            proxy_connect_timeout 1s;
-            proxy_read_timeout 5s;
+            proxy_connect_timeout 3s;
+            proxy_read_timeout 10s;
 
             proxy_next_upstream error timeout;
             proxy_next_upstream_tries 2;
-            proxy_next_upstream_timeout 3s;
+            proxy_next_upstream_timeout 10s;
         }
     }
 }
