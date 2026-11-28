@@ -73,3 +73,35 @@ class PruebasDjango(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn("text/html", r["Content-Type"])
         self.assertIn("Nodo Ruta", r.content.decode("utf-8"))
+
+    def test_prioridad_rds_postgresql_cuando_db_host_activo(self):
+        from unittest.mock import patch
+
+        datos_rds = {
+            "version": "datos-rds-v1",
+            "pedidos": [
+                {
+                    "id": "PED-RDS-1",
+                    "zona": "Norte",
+                    "estado": "En ruta",
+                    "prioridad": "Alta",
+                    "vehiculo": "Furgón RDS",
+                    "ventana": "09:00 - 11:00",
+                    "progreso": 80,
+                    "novedad": "Desde Amazon RDS PostgreSQL",
+                }
+            ],
+        }
+        with patch.dict(os.environ, {"DB_HOST": "nodoruta-rds.us-east-1.rds.amazonaws.com"}):
+            with patch("nodoruta_web.db.cargar_datos_postgres", return_value=datos_rds):
+                r_health = self.client.get("/health")
+                self.assertEqual(r_health.status_code, 200)
+                self.assertEqual(r_health.json()["version_datos"], "datos-rds-v1")
+
+                r_pedidos = self.client.get("/pedidos")
+                self.assertEqual(r_pedidos.status_code, 200)
+                self.assertEqual(r_pedidos.json()["pedidos"][0]["id"], "PED-RDS-1")
+
+            with patch("nodoruta_web.db.cargar_datos_postgres", side_effect=ValueError("Fallo simulado en RDS")):
+                self.assertEqual(self.client.get("/health").status_code, 503)
+                self.assertEqual(self.client.get("/pedidos").status_code, 503)

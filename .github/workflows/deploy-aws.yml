@@ -1,0 +1,80 @@
+name: CD - Validar AWS (RDS + 2 EC2 + VPC) y Publicar Imagen
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+      - dev
+  pull_request:
+    branches:
+      - main
+      - master
+      - dev
+
+permissions:
+  contents: read
+
+jobs:
+  validate-aws-and-build:
+    name: 1. Validar App (RDS + Fallback JSON), Compose AWS, CloudShell y Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias Python (Django, Gunicorn, psycopg)
+        run: pip install -r requirements.txt
+
+      - name: Ejecutar pruebas unitarias locales (RDS PostgreSQL y fallback JSON)
+        run: python -m unittest discover -s tests -v
+
+      - name: Compilar módulos Python y CLI de RDS
+        run: |
+          python -m py_compile app.py manage.py nodoruta_web/*.py scripts/*.py
+
+      - name: Validar sintaxis de scripts Bash para AWS CloudShell
+        run: |
+          bash -n scripts/deploy_cloudshell.sh
+          bash -n scripts/destroy_cloudshell.sh
+          sh -n scripts/ops.sh
+
+      - name: Validar compose.yaml, compose.aws.yaml y construcción de Dockerfile
+        run: |
+          python scripts/datos.py preparar
+          docker compose -f compose.yaml config -q
+          docker compose -f compose.aws.yaml config -q
+          docker build -t nodo-ruta-app:aws-ci .
+
+      - name: Validar sintaxis de Terraform (VPC + NAT + 2 EC2 + RDS PostgreSQL)
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.6.6"
+
+      - name: Ejecutar terraform init y terraform validate
+        working-directory: infra
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: Iniciar sesion en Docker Hub (Opcional si hay secretos configurados)
+        if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Publicar imagen en Docker Hub (Opcional)
+        if: ${{ secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/nodo-ruta-app:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/nodo-ruta-app:${{ github.ref_name }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/nodo-ruta-app:${{ github.sha }}

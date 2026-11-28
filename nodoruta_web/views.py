@@ -1,9 +1,11 @@
-"""Vistas HTTP de Nodo Ruta (mantiene el contrato de / , /health y /pedidos)."""
+"""Vistas HTTP de Nodo Ruta (mantiene el contrato de / , /health y /pedidos con soporte RDS PostgreSQL + fallback JSON)."""
 import json
 import os
 from pathlib import Path
 
 from django.http import HttpResponse, JsonResponse
+
+from . import db
 
 _PANEL_HTML = (Path(__file__).resolve().with_name("panel.html")).read_text(encoding="utf-8")
 
@@ -25,6 +27,12 @@ def _json(data, status=200):
 
 
 def _cargar_datos():
+    if db.usar_postgres():
+        try:
+            return db.cargar_datos_postgres()
+        except Exception as exc:
+            raise ValueError(f"Error consultando RDS PostgreSQL: {exc}") from exc
+
     data = json.loads(_ruta_datos().read_text(encoding="utf-8"))
     if not isinstance(data, dict) or not isinstance(data.get("pedidos"), list):
         raise ValueError("Formato de datos inválido")

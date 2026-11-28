@@ -7,9 +7,11 @@ respaldos
 evidencias
 docs
 tests
-scripts
 proxy
+infra
+trabajo propuesto
 *.md
+*.pdf
 *.pyc
 db.sqlite3
 __pycache__

@@ -1,0 +1,88 @@
+# Despliegue en nube para la EC2 #2 (Subred Privada - Contenedores de Aplicación)
+# - Se construye directamente desde el repositorio clonado (git clone + docker compose up -d --build).
+# - Se conecta a la instancia Amazon RDS PostgreSQL en la subred privada (con fallback opcional a JSON).
+# - Publica app1 en 8081 y app2 en 8082 hacia la VPC para que la EC2 #1 (Proxy NGINX en subred pública)
+#   reparta el tráfico entre ambas instancias.
+#
+# Variables requeridas en .env (generado automáticamente por Terraform / CloudShell user_data):
+#   DB_HOST=nodoruta-db.xxxx.us-east-1.rds.amazonaws.com
+#   DB_PORT=5432
+#   DB_NAME=nodoruta
+#   DB_USER=nodoruta_admin
+#   DB_PASSWORD=TuPasswordSeguro
+name: nodo-ruta-aws
+
+x-app: &app
+  build:
+    context: .
+  image: nodo-ruta-app:aws
+  restart: unless-stopped
+  init: true
+  stop_grace_period: 3s
+  read_only: true
+  tmpfs:
+    - /tmp
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  mem_limit: 128m
+  cpus: 0.5
+  environment: &app_env
+    DB_HOST: ${DB_HOST:-}
+    DB_PORT: ${DB_PORT:-5432}
+    DB_NAME: ${DB_NAME:-nodoruta}
+    DB_USER: ${DB_USER:-nodoruta_admin}
+    DB_PASSWORD: ${DB_PASSWORD:-}
+    DB_SSLMODE: ${DB_SSLMODE:-require}
+    DJANGO_ALLOWED_HOSTS: "*"
+    DATA_PATH: /app/pedidos.json
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2).read()"]
+    interval: 5s
+    timeout: 3s
+    retries: 3
+    start_period: 10s
+
+services:
+  migrador-rds:
+    <<: *app
+    restart: "no"
+    healthcheck:
+      disable: true
+    command: ["python", "scripts/datos_rds.py", "preparar"]
+
+  app1:
+    <<: *app
+    depends_on:
+      migrador-rds:
+        condition: service_completed_successfully
+    ports:
+      - "8081:8080"
+    environment:
+      <<: *app_env
+      INSTANCE_ID: app1
+
+  app2:
+    <<: *app
+    depends_on:
+      migrador-rds:
+        condition: service_completed_successfully
+    ports:
+      - "8082:8080"
+    environment:
+      <<: *app_env
+      INSTANCE_ID: app2
+
+  # Herramienta CLI para operar respaldos, simular error 503 y restaurar en RDS PostgreSQL:
+  #   docker compose -f compose.aws.yaml run --rm ops-rds respaldar
+  #   docker compose -f compose.aws.yaml run --rm ops-rds simular-error
+  #   docker compose -f compose.aws.yaml run --rm ops-rds restaurar
+  ops-rds:
+    <<: *app
+    profiles: ["tools"]
+    restart: "no"
+    healthcheck:
+      disable: true
+    entrypoint: ["python", "scripts/datos_rds.py"]

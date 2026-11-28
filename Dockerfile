@@ -15,6 +15,8 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY manage.py ./
+COPY pedidos.json ./
+COPY scripts ./scripts
 COPY nodoruta_web ./nodoruta_web
 
 USER 10001

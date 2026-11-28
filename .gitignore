@@ -3,6 +3,14 @@
 *.pem
 *.key
 secrets/
+cloudshell_resources.env
+
+# Estado local de Terraform
+infra/.terraform/
+infra/.terraform.lock.hcl
+infra/*.tfstate
+infra/*.tfstate.*
+infra/*.tfvars
 
 # Copia de trabajo, respaldos y evidencias locales (se generan al probar)
 data/

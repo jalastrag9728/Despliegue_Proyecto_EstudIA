@@ -1,0 +1,45 @@
+# Configuración de NGINX para la EC2 #1 (Subred Pública - Proxy Inverso)
+# Balancea las peticiones hacia la EC2 #2 (Subred Privada) en los puertos 8081 (app1) y 8082 (app2).
+# La variable __APP_PRIVATE_IP__ se reemplaza automáticamente en el arranque de la instancia.
+
+worker_processes auto;
+error_log /dev/stderr warn;
+pid /tmp/nginx.pid;
+
+events {
+    worker_connections 256;
+}
+
+http {
+    log_format proxylog '$time_iso8601 cliente=$remote_addr "$request" '
+                        'http=$status upstream=$upstream_addr upstream_http=$upstream_status '
+                        'tiempo_upstream_s=$upstream_response_time';
+    access_log /dev/stdout proxylog;
+
+    upstream nodoruta {
+        zone nodoruta 64k;
+        server __APP_PRIVATE_IP__:8081 max_fails=1 fail_timeout=5s;
+        server __APP_PRIVATE_IP__:8082 max_fails=1 fail_timeout=5s;
+    }
+
+    server {
+        listen 80;
+        server_tokens off;
+
+        location / {
+            proxy_pass http://nodoruta;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+
+            proxy_connect_timeout 1s;
+            proxy_read_timeout 5s;
+
+            # Reintenta en la otra instancia SOLO ante errores de conexión o timeout.
+            # Un HTTP 503 significa fallo en RDS PostgreSQL (común a ambas instancias) y se reporta tal cual.
+            proxy_next_upstream error timeout;
+            proxy_next_upstream_tries 2;
+            proxy_next_upstream_timeout 3s;
+        }
+    }
+}
